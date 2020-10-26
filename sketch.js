@@ -4,11 +4,12 @@ const random = require('canvas-sketch-util/random');
 const palettes = require('nice-color-palettes');
 
 const settings = {
-  dimensions: [ 2048, 2048 ]
+  dimensions: [ 4096, 2048 ],
+  suffix: `-${random.getRandomSeed()}`
 };
 
 const sketch = () => {
-  const colorCount = random.range(2, 5);
+  const colorCount = random.range(5, 5);
   const palette = random.shuffle(random.pick(palettes)).slice(0, colorCount);
 
   const createGrid = (dimension) => {
@@ -21,9 +22,9 @@ const sketch = () => {
 
         points.push({
           position: [u, v],
-          radius: Math.abs(random.noise2D(u, v)) * 0.25,
-          rotation: Math.abs(random.noise2D(u, v)),
-          color: random.pick(palette)
+          // radius: Math.abs(random.noise2D(u, v)) * 0.05,
+          // rotation: Math.abs(random.noise2D(u, v)), // For drawing character
+          // color: 'black'
         });
       }
     }
@@ -31,34 +32,86 @@ const sketch = () => {
     return points;
   }
 
-  const pointCount = 40;
-  const points = createGrid(pointCount).filter(() => random.value() > 0.5);
+  const createWall = (points) => {
+    let filteredPoints = points.filter(({position}) => position[1] !== 1);
+    const result = [];
+    
+    for ( ; filteredPoints.length > 0 ; ) {
+      // Pick 2 random points
+      const pointA = random.pick(filteredPoints);
+      filteredPoints = filteredPoints.filter(({position}) => position[0] !== pointA.position[0] || position[1] !== pointA.position[1])
+
+      const pointB = random.pick(filteredPoints);
+      filteredPoints = filteredPoints.filter(({position}) => position[0] !== pointB.position[0] || position[1] !== pointB.position[1])
+    
+      result.push({
+        pointA,
+        pointB,
+        averageY: (pointA.position[1] + pointB.position[1]) / 2,
+        color: random.pick(palette)
+      })
+    }
+
+    return result.sort((a, b) => a.averageY - b.averageY);
+  }
+
+  const dimension = 6;
+  // const points = createGrid(6).filter(() => random.value() > 0.5);
+  const points = createWall(createGrid(dimension));
   const margin = 300;
   
 
   return ({ context, width, height }) => {
     context.fillStyle = 'white';
     context.fillRect(0, 0, width, height);
+    context.lineWidth = 5;
 
-    points.forEach(({radius, position, color, rotation}) => {
-      const [u, v] = position;
+    // points.forEach(({radius, position, color, rotation}) => {
+    //   const [u, v] = position;
 
-      const x = lerp(margin, width - margin, u);
-      const y = lerp(margin, height - margin, v);
+    //   const x = lerp(margin, width - margin, u);
+    //   const y = lerp(margin, height - margin, v);
 
-      // context.beginPath();
-      // context.arc(x, y, radius * width, 0 , Math.PI * 2);
-      // context.fillStyle = color;
-      // context.fill();
+    //   // Draw circle
+    //   context.beginPath();
+    //   context.arc(x, y, radius * width, 0 , Math.PI * 2);
+    //   context.fillStyle = color;
+    //   context.fill();
 
-      context.save();
+    //   // Draw Character
+    //   // context.save();
+    //   // context.fillStyle = color;
+    //   // context.font = `${radius * width}px "Helvetica"`;
+    //   // context.translate(x, y);
+    //   // context.rotate(rotation);
+    //   // context.fillText('-', 0, 0);
+    //   // context.restore();
+    // })
+
+    points.forEach(({pointA, pointB, color}) => {
+      const [uA, vA] = pointA.position;
+      const xA = lerp(margin, width - margin, uA);
+      const yA = lerp(margin, height - margin, vA);
+
+      const [uB, vB] = pointB.position;
+      const xB = lerp(margin, width - margin, uB);
+      const yB = lerp(margin, height - margin, vB);
+
+      // Draw line
+      context.beginPath();
+      context.moveTo(xA, yA);
+      context.lineTo(xB, yB);
+      context.lineTo(xB, height - margin);
+      context.lineTo(xA, height - margin);
+      context.closePath();
       context.fillStyle = color;
-      context.font = `${radius * width}px "Helvetica"`;
-      context.translate(x, y);
-      context.rotate(rotation);
-      context.fillText('-', 0, 0);
-      context.restore();
+      context.fill();
+      context.strokeStyle = 'white';
+      context.lineWidth = 35;
+      context.stroke();
     })
+
+    
   };
 };
 
